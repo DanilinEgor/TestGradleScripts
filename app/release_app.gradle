@@ -26,11 +26,26 @@ def gitCreateReleaseBranch() {
     def releaseVer = calculateVersionName()
     def branch = "release-" + releaseVer
     def proc = ("git checkout -b " + branch).execute()
-    proc.in.eachLine { line -> print line }
+    proc.in.eachLine { line -> println line }
     proc.err.eachLine { line -> println line }
     proc.waitFor()
     proc = ("git push -u origin " + branch).execute()
-    proc.in.eachLine { line -> print line }
+    proc.in.eachLine { line -> println line }
+    proc.err.eachLine { line -> println line }
+    proc.waitFor()
+}
+
+def gitPushVersionToMaster() {
+    def proc = "git add app/version.properties".execute()
+    proc.in.eachLine { line -> println line }
+    proc.err.eachLine { line -> println line }
+    proc.waitFor()
+    proc = ("git commit -m \"Version " + calculateVersionName() + "\"").execute()
+    proc.in.eachLine { line -> println line }
+    proc.err.eachLine { line -> println line }
+    proc.waitFor()
+    proc = "git push origin master".execute()
+    proc.in.eachLine { line -> println line }
     proc.err.eachLine { line -> println line }
     proc.waitFor()
 }
@@ -49,19 +64,20 @@ task('new_branch') << {
 }
 
 task('new_release') << {
-    def branchIsClean = gitCheckCleanBranch()
-    if (branchIsClean) {
+//    def branchIsClean = gitCheckCleanBranch()
+//    if (branchIsClean) {
         def branch = gitBranch()
         println("branch is " + branch)
         if (branch == "master") {
             incrementMajorNumber()
+            gitPushVersionToMaster()
             gitCreateReleaseBranch()
         } else {
             println "Error: Not in master branch!"
         }
-    } else {
-        println "Error: branch is not clean!"
-    }
+//    } else {
+//        println "Error: branch is not clean!"
+//    }
 }
 
 ext {
