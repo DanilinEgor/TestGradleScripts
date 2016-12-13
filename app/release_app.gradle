@@ -9,7 +9,6 @@ task('fabric', dependsOn: ['clean', 'buildReleaseApk']) {
 }
 
 def gitBranch() {
-    println "fuck it"
     def branch = ""
     def proc = "git rev-parse --abbrev-ref HEAD".execute()
     proc.in.eachLine { line -> branch = line }
@@ -25,25 +24,43 @@ def calculateVersionName() {
 
 def gitCreateReleaseBranch() {
     def releaseVer = calculateVersionName()
-    def proc = ("git checkout -b release-" + releaseVer).execute()
+    def branch = "release-" + releaseVer
+    def proc = ("git checkout -b " + branch).execute()
+    proc.in.eachLine { line -> print line }
+    proc.err.eachLine { line -> println line }
+    proc.waitFor()
+    proc = ("git push -u origin " + branch).execute()
     proc.in.eachLine { line -> print line }
     proc.err.eachLine { line -> println line }
     proc.waitFor()
 }
 
-task('new_branch') {
+def gitCheckCleanBranch() {
+    def clean = true
+    def proc = "git status --porcelain".execute()
+    proc.in.eachLine { line -> clean = false }
+    proc.waitFor()
+    clean
+}
+
+task('new_branch') << {
     println "called new branch"
     gitCreateReleaseBranch()
 }
 
-task('new_release') {
-    def branch = gitBranch()
-    println("branch is " + branch)
-    if (branch == "master") {
-        incrementMajorNumber()
-        gitCreateReleaseBranch()
+task('new_release') << {
+    def branchIsClean = gitCheckCleanBranch()
+    if (branchIsClean) {
+        def branch = gitBranch()
+        println("branch is " + branch)
+        if (branch == "master") {
+            incrementMajorNumber()
+            gitCreateReleaseBranch()
+        } else {
+            println "Error: Not in master branch!"
+        }
     } else {
-        println "Error: Not in master branch!"
+        println "Error: branch is not clean!"
     }
 }
 
