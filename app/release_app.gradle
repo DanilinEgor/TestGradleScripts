@@ -74,9 +74,12 @@ task('new_release') << {
     proc.in.eachLine { line -> println line }
     proc.err.eachLine { line -> println line }
     proc.waitFor()
+
     def com = "git commit -m 'Version 1'"// + calculateVersionName() + "'"
     println com
-    proc = com.execute()
+    exec {
+        commandLine 'git', 'commit', '-m', '"Version 1"'
+    }
     proc.in.eachLine { line -> println line }
     proc.err.eachLine { line -> println line }
     proc.waitFor()
