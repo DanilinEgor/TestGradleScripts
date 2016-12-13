@@ -40,12 +40,9 @@ def gitPushVersionToMaster() {
     proc.in.eachLine { line -> println line }
     proc.err.eachLine { line -> println line }
     proc.waitFor()
-    def com = "git commit -m \"Version " + calculateVersionName() + "\""
-    println com
-    proc = com.execute()
-    proc.in.eachLine { line -> println line }
-    proc.err.eachLine { line -> println line }
-    proc.waitFor()
+    exec {
+        commandLine 'git', 'commit', '-m', "Version " + calculateVersionName()
+    }
     proc = "git push origin master".execute()
     proc.in.eachLine { line -> println line }
     proc.err.eachLine { line -> println line }
@@ -66,38 +63,21 @@ task('new_branch') << {
 }
 
 task('new_release') << {
-//    def branchIsClean = gitCheckCleanBranch()
-
-    incrementMajorNumber()
-
-    def proc = "git add .".execute()
-    proc.in.eachLine { line -> println line }
-    proc.err.eachLine { line -> println line }
-    proc.waitFor()
-
-    def com = "git commit -m 'Version 1'"// + calculateVersionName() + "'"
-    println com
-    exec {
-        commandLine 'git', 'commit', '-m', '"Version 1"'
-    }
-    proc.in.eachLine { line -> println line }
-    proc.err.eachLine { line -> println line }
-    proc.waitFor()
-
+    def branchIsClean = gitCheckCleanBranch()
 //    if (branchIsClean) {
-//    if (true) {
-//        def branch = gitBranch()
-//        println("branch is " + branch)
-//        if (branch == "master") {
-//            incrementMajorNumber()
-//            gitPushVersionToMaster()
-//            gitCreateReleaseBranch()
-//        } else {
-//            println "Error: Not in master branch!"
-//        }
-//    } else {
-//        println "Error: branch is not clean!"
-//    }
+    if (true) {
+        def branch = gitBranch()
+        println("branch is " + branch)
+        if (branch == "master") {
+            incrementMajorNumber()
+            gitPushVersionToMaster()
+            gitCreateReleaseBranch()
+        } else {
+            println "Error: Not in master branch!"
+        }
+    } else {
+        println "Error: branch is not clean!"
+    }
 }
 
 ext {
