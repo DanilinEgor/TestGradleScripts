@@ -1,0 +1,188 @@
+task('bumpVersion', type: BumpVersion)
+task('uploadToFabric', dependsOn: 'crashlyticsUploadDistributionRelease')
+
+task('FABRIC-BUMP-APK', dependsOn: ['buildReleaseApk', 'clean', 'bumpVersion'])
+
+task('buildReleaseApk', dependsOn: 'assembleRelease')
+
+buildReleaseApk.mustRunAfter clean
+clean.mustRunAfter bumpVersion
+
+task('fabric', dependsOn: ['clean', 'buildReleaseApk']) {//, 'uploadToFabric']) {
+    doLast {
+        println "Built and uploaded to Fabric"
+    }
+    uploadToFabric.mustRunAfter buildReleaseApk
+}
+
+def gitBranch() {
+    def branch = ""
+    def proc = "git rev-parse --abbrev-ref HEAD".execute()
+    proc.in.eachLine { line -> branch = line }
+    proc.err.eachLine { line -> println line }
+    proc.waitFor()
+    branch
+}
+
+def gitCreateReleaseBranch() {
+    def branch = ""
+    def proc = "git rev-parse --abbrev-ref HEAD".execute()
+    proc.in.eachLine { line -> branch = line }
+    proc.err.eachLine { line -> println line }
+    proc.waitFor()
+    branch
+}
+
+task('new_release') {
+    def branch = gitBranch()
+    println("branch is " + branch)
+    if (branch == "AND-456") {
+        incrementMajorNumber()
+        gitCreateReleaseBranch()
+    } else {
+        println "Error: Not in master branch!"
+    }
+}
+
+class BumpVersion extends DefaultTask {
+    File verFile
+
+    BumpVersion() {
+        group = 'build'
+        description = 'Update version'
+        verFile = new File(project.rootDir.absolutePath + "/app/version.properties")
+    }
+
+    @TaskAction
+    def bump() {
+        Properties versions = getVersionProperties()
+        String versionName = versions['RELEASE_VERSION_NAME']
+        if (versionName == null) {
+            versionName = "1.0"
+        }
+        def (major, minor) = versionName.tokenize('.').collect({ it.toInteger() })
+        String newVersionName = (major + 1) + "." + minor
+        println "New version: " + newVersionName
+        versions['RELEASE_VERSION_NAME'] = newVersionName
+        writeVersionProperties(versions)
+    }
+
+    Properties getVersionProperties() {
+        if (!verFile.canRead()) {
+            verFile.createNewFile()
+        }
+
+        def versions = new Properties()
+
+        def input = new FileInputStream(verFile)
+        versions.load(input)
+        input.close()
+
+        return versions
+    }
+
+    def writeVersionProperties(Properties versions) {
+        def writer = new FileOutputStream(verFile)
+        try {
+            versions.store(writer, "Build version updated with each release build")
+            writer.flush()
+        } finally {
+            writer.close()
+        }
+    }
+}
+
+ext {
+    versionFile = new File(project.rootDir.absolutePath + "/app/version.properties")
+    calculateVersionName = {
+        def version = readVersionProperties()
+        return "${version['major']}.${version['hotfix']}"
+    }
+    calculateVersionCode = {
+        def version = readVersionProperties()
+        def major = version['major'] as int
+        def hotfix = version['hotfix'] as int
+        return major * 100 + hotfix
+    }
+}
+
+Properties readVersionProperties() {
+    def version = new Properties()
+    def stream
+    try {
+        stream = new FileInputStream(versionFile)
+        version.load(stream)
+    } catch (FileNotFoundException ignore) {
+    } finally {
+        if (stream != null) stream.close()
+    }
+    // safety defaults in case file is missing
+    if (!version['major']) version['major'] = "1"
+    if (!version['hotfix']) version['hotfix'] = "0"
+    return version
+}
+
+void incrementMajorNumber() {
+    def version = readVersionProperties()
+
+    def major = version['major'] as int
+    major++
+    version['major'] = major.toString()
+
+    def stream = new FileOutputStream(versionFile)
+    try {
+        version.store(stream, null)
+    } finally {
+        stream.close()
+    }
+}
+
+void incrementHotfixNumber() {
+    def version = readVersionProperties()
+
+    def hotfix = version['hotfix'] as int
+    hotfix++
+    version['hotfix'] = hotfix.toString()
+
+    def stream = new FileOutputStream(versionFile)
+    try {
+        version.store(stream, null)
+    } finally {
+        stream.close()
+    }
+}
+
+task incrementVersion {
+    description "Increments build counter in ${versionFile}"
+    doFirst {
+        incrementMajorNumber()
+    }
+}
+
+if (plugins.hasPlugin('android') || plugins.hasPlugin('android-library')) {
+    android {
+        defaultConfig {
+            versionName = calculateVersionName()
+            versionCode = calculateVersionCode()
+        }
+
+        afterEvaluate {
+            def autoIncrementVariant = { variant ->
+                if (variant.buildType.name == buildTypes.release.name) {
+                    // don't increment on debug builds
+                    variant.preBuild.dependsOn incrementVersion
+                    incrementVersion.doLast {
+                        variant.mergedFlavor.versionName = calculateVersionName()
+                        variant.mergedFlavor.versionCode = calculateVersionCode()
+                    }
+                }
+            }
+            if (plugins.hasPlugin('android')) {
+                applicationVariants.all { variant -> autoIncrementVariant(variant) }
+            }
+            if (plugins.hasPlugin('android-library')) {
+                libraryVariants.all { variant -> autoIncrementVariant(variant) }
+            }
+        }
+    }
+}
