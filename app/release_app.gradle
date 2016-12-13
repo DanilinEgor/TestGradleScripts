@@ -64,8 +64,8 @@ task('new_branch') << {
 }
 
 task('new_release') << {
-//    def branchIsClean = gitCheckCleanBranch()
-//    if (branchIsClean) {
+    def branchIsClean = gitCheckCleanBranch()
+    if (branchIsClean) {
         def branch = gitBranch()
         println("branch is " + branch)
         if (branch == "master") {
@@ -75,9 +75,9 @@ task('new_release') << {
         } else {
             println "Error: Not in master branch!"
         }
-//    } else {
-//        println "Error: branch is not clean!"
-//    }
+    } else {
+        println "Error: branch is not clean!"
+    }
 }
 
 ext {
