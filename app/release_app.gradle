@@ -1,21 +1,15 @@
-task('bumpVersion', type: BumpVersion)
-task('uploadToFabric', dependsOn: 'crashlyticsUploadDistributionRelease')
-
-task('FABRIC-BUMP-APK', dependsOn: ['buildReleaseApk', 'clean', 'bumpVersion'])
-
 task('buildReleaseApk', dependsOn: 'assembleRelease')
 
 buildReleaseApk.mustRunAfter clean
-clean.mustRunAfter bumpVersion
 
-task('fabric', dependsOn: ['clean', 'buildReleaseApk']) {//, 'uploadToFabric']) {
+task('fabric', dependsOn: ['clean', 'buildReleaseApk']) {
     doLast {
         println "Built and uploaded to Fabric"
     }
-    uploadToFabric.mustRunAfter buildReleaseApk
 }
 
 def gitBranch() {
+    println "fuck it"
     def branch = ""
     def proc = "git rev-parse --abbrev-ref HEAD".execute()
     proc.in.eachLine { line -> branch = line }
@@ -24,71 +18,32 @@ def gitBranch() {
     branch
 }
 
+def calculateVersionName() {
+    def version = readVersionProperties()
+    "${version['major']}.${version['hotfix']}"
+}
+
 def gitCreateReleaseBranch() {
-    def branch = ""
-    def proc = "git rev-parse --abbrev-ref HEAD".execute()
-    proc.in.eachLine { line -> branch = line }
+    def releaseVer = calculateVersionName()
+    def proc = ("git checkout -b release-" + releaseVer).execute()
+    proc.in.eachLine { line -> print line }
     proc.err.eachLine { line -> println line }
     proc.waitFor()
-    branch
+}
+
+task('new_branch') {
+    println "called new branch"
+    gitCreateReleaseBranch()
 }
 
 task('new_release') {
     def branch = gitBranch()
     println("branch is " + branch)
-    if (branch == "AND-456") {
+    if (branch == "master") {
         incrementMajorNumber()
         gitCreateReleaseBranch()
     } else {
         println "Error: Not in master branch!"
-    }
-}
-
-class BumpVersion extends DefaultTask {
-    File verFile
-
-    BumpVersion() {
-        group = 'build'
-        description = 'Update version'
-        verFile = new File(project.rootDir.absolutePath + "/app/version.properties")
-    }
-
-    @TaskAction
-    def bump() {
-        Properties versions = getVersionProperties()
-        String versionName = versions['RELEASE_VERSION_NAME']
-        if (versionName == null) {
-            versionName = "1.0"
-        }
-        def (major, minor) = versionName.tokenize('.').collect({ it.toInteger() })
-        String newVersionName = (major + 1) + "." + minor
-        println "New version: " + newVersionName
-        versions['RELEASE_VERSION_NAME'] = newVersionName
-        writeVersionProperties(versions)
-    }
-
-    Properties getVersionProperties() {
-        if (!verFile.canRead()) {
-            verFile.createNewFile()
-        }
-
-        def versions = new Properties()
-
-        def input = new FileInputStream(verFile)
-        versions.load(input)
-        input.close()
-
-        return versions
-    }
-
-    def writeVersionProperties(Properties versions) {
-        def writer = new FileOutputStream(verFile)
-        try {
-            versions.store(writer, "Build version updated with each release build")
-            writer.flush()
-        } finally {
-            writer.close()
-        }
     }
 }
 
@@ -107,6 +62,7 @@ ext {
 }
 
 Properties readVersionProperties() {
+    def versionFile = new File(project.rootDir.absolutePath + "/app/version.properties")
     def version = new Properties()
     def stream
     try {
@@ -123,6 +79,8 @@ Properties readVersionProperties() {
 }
 
 void incrementMajorNumber() {
+    def versionFile = new File(project.rootDir.absolutePath + "/app/version.properties")
+
     def version = readVersionProperties()
 
     def major = version['major'] as int
