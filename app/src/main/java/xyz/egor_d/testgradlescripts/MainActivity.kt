@@ -15,7 +15,7 @@ class MainActivity : AppCompatActivity() {
         val toolbar = findViewById(R.id.toolbar) as Toolbar
         setSupportActionBar(toolbar)
 
-        // 2
+        // 3
 
         val fab = findViewById(R.id.fab) as FloatingActionButton
         fab.setOnClickListener(View.OnClickListener { view ->
